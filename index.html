@@ -1,0 +1,407 @@
+```html
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Technischer Service & Hausmeister Pro (Cloud Sync)</title>
+
+  <!-- PWA Manifest -->
+  <link rel="manifest" href="data:application/json;base64,ewogICJuYW1lIjogIkhhdXNtZWlzdGVyIFBybyBDbG91ZCIsCiAgInNob3J0X25hbWUiOiAiSGF1c21laXN0ZXIiLAogICJzdGFydF91cmwiOiAiLiIsCiAgImRpc3BsYXkiOiAic3RhbmRhbG9uZSIsCiAgImJhY2tncm91bmRfY29sb3IiOiAiIzBmMTcyYSIsCiAgInRoZW1lX2NvbG9yIjogIiMyNTYzZWIiCn0=">
+
+  <!-- Tailwind CSS & FontAwesome Icons -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+  <style>
+    body { -webkit-tap-highlight-color: transparent; user-select: none; }
+    .emergency-pulse { animation: pulse-red 2s infinite; }
+    @keyframes pulse-red {
+      0% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.7); }
+      70% { box-shadow: 0 0 0 10px rgba(239, 68, 68, 0); }
+      100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0); }
+    }
+  </style>
+</head>
+<body class="bg-slate-900 text-slate-100 min-h-screen flex flex-col font-sans">
+
+  <!-- HEADER -->
+  <header class="bg-slate-800 border-b border-slate-700 p-4 sticky top-0 z-20 shadow-md">
+    <div class="max-w-md mx-auto flex justify-between items-center">
+      <div>
+        <h1 class="text-lg font-bold text-white flex items-center gap-2">
+          <i class="fa-solid fa-cloud-bolt text-blue-500"></i> Hausmeister Pro
+        </h1>
+        <p class="text-xs text-slate-400" id="role-subtitle">Ansicht: Technischer Leiter</p>
+      </div>
+      
+      <div class="flex items-center gap-2">
+        <!-- Live Connection Status -->
+        <span id="sync-status" class="text-[10px] px-2 py-1 rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 flex items-center gap-1">
+          <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span> Live Sync
+        </span>
+
+        <!-- Role Switcher -->
+        <button id="role-toggle" class="bg-slate-700 hover:bg-slate-600 border border-slate-600 px-3 py-1.5 rounded-lg text-xs font-semibold text-blue-400 flex items-center gap-1.5 transition">
+          <i class="fa-solid fa-user-gear"></i> <span id="role-label">Leiter</span>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- NAVIGATION TABS -->
+  <nav class="bg-slate-800/90 backdrop-blur border-b border-slate-700 sticky top-[65px] z-10">
+    <div class="max-w-md mx-auto flex text-sm font-medium">
+      <button id="tab-tasks" class="flex-1 py-3 text-center border-b-2 border-blue-500 text-blue-400 font-bold flex justify-center items-center gap-2">
+        <i class="fa-solid fa-list-check"></i> Aufgaben <span id="task-count-badge" class="bg-blue-600 text-white text-[10px] px-1.5 py-0.5 rounded-full">0</span>
+      </button>
+      <button id="tab-locations" class="flex-1 py-3 text-center border-b-2 border-transparent text-slate-400 hover:text-slate-200 flex justify-center items-center gap-2">
+        <i class="fa-solid fa-building"></i> Objekte <span id="loc-count-badge" class="bg-slate-700 text-slate-300 text-[10px] px-1.5 py-0.5 rounded-full">0</span>
+      </button>
+    </div>
+  </nav>
+
+  <!-- MAIN CONTENT AREA -->
+  <main class="flex-1 max-w-md w-full mx-auto p-4 pb-24">
+
+    <!-- SEKTION: AUFGABEN -->
+    <section id="sec-tasks" class="space-y-4">
+      <div class="flex justify-between items-center gap-2">
+        <button id="btn-open-task-modal" class="bg-blue-600 hover:bg-blue-500 text-white font-semibold py-2 px-4 rounded-lg text-sm shadow-lg flex items-center gap-2 transition">
+          <i class="fa-solid fa-plus"></i> Neue Aufgabe
+        </button>
+        <select id="filter-type" class="bg-slate-800 border border-slate-700 text-xs text-slate-200 rounded-lg p-2 focus:ring-2 focus:ring-blue-500 outline-none">
+          <option value="ALL">Alle Aufgaben</option>
+          <option value="EMERGENCY">🚨 Nur Notfälle</option>
+          <option value="ROUTINE">🛠️ Nur Wartung</option>
+          <option value="OPEN">⭕ Nur Offen</option>
+          <option value="DONE">✓ Nur Erledigt</option>
+        </select>
+      </div>
+
+      <!-- Live Task Cards -->
+      <div id="tasks-container" class="space-y-3">
+        <div class="text-center py-8 text-slate-500 text-xs flex items-center justify-center gap-2">
+          <i class="fa-solid fa-spinner animate-spin"></i> Synchronisiere mit Cloud...
+        </div>
+      </div>
+    </section>
+
+    <!-- SEKTION: OBJEKTE -->
+    <section id="sec-locations" class="space-y-4 hidden">
+      <div class="flex justify-between items-center">
+        <h2 class="font-bold text-slate-200">Verwaltete Objekte</h2>
+        <button id="btn-open-loc-modal" class="bg-blue-600 hover:bg-blue-500 text-white font-semibold py-2 px-3 rounded-lg text-xs shadow-lg flex items-center gap-1 transition">
+          <i class="fa-solid fa-plus"></i> Objekt hinzufügen
+        </button>
+      </div>
+
+      <!-- Live Location Cards -->
+      <div id="locations-container" class="space-y-3">
+        <div class="text-center py-8 text-slate-500 text-xs flex items-center justify-center gap-2">
+          <i class="fa-solid fa-spinner animate-spin"></i> Synchronisiere mit Cloud...
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- MODAL: NEUE AUFGABE -->
+  <div id="modal-task" class="fixed inset-0 bg-black/75 backdrop-blur-sm z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 hidden">
+    <div class="bg-slate-800 border border-slate-700 w-full max-w-md rounded-t-2xl sm:rounded-2xl p-5 space-y-4 max-h-[90vh] overflow-y-auto">
+      <div class="flex justify-between items-center border-b border-slate-700 pb-3">
+        <h3 class="font-bold text-lg text-white"><i class="fa-solid fa-tasks text-blue-400"></i> Neue Aufgabe verteilen</h3>
+        <button class="btn-close-modal text-slate-400 hover:text-white"><i class="fa-solid fa-xmark text-xl"></i></button>
+      </div>
+
+      <form id="form-task" class="space-y-3">
+        <div>
+          <label class="block text-xs font-medium text-slate-400 mb-1">Aufgaben-Titel *</label>
+          <input type="text" id="task-title" required placeholder="z. B. Wasserrohrbruch / Heizung wartung" class="w-full bg-slate-900 border border-slate-700 rounded-lg p-2.5 text-sm text-white focus:border-blue-500 outline-none">
+        </div>
+
+        <div>
+          <label class="block text-xs font-medium text-slate-400 mb-1">Objekt / Standort wählen *</label>
+          <select id="task-location" required class="w-full bg-slate-900 border border-slate-700 rounded-lg p-2.5 text-sm text-white focus:border-blue-500 outline-none">
+            <option value="">-- Bitte Objekt auswählen --</option>
+          </select>
+        </div>
+
+        <div class="grid grid-cols-2 gap-2">
+          <div>
+            <label class="block text-xs font-medium text-slate-400 mb-1">Dringlichkeit</label>
+            <select id="task-type" class="w-full bg-slate-900 border border-slate-700 rounded-lg p-2.5 text-sm text-white focus:border-blue-500 outline-none">
+              <option value="ROUTINE">🛠️ Wartung / Standard</option>
+              <option value="EMERGENCY">🚨 NOTFALL (Emergency)</option>
+            </select>
+          </div>
+          <div>
+            <label class="block text-xs font-medium text-slate-400 mb-1">Turnus</label>
+            <select id="task-interval" class="w-full bg-slate-900 border border-slate-700 rounded-lg p-2.5 text-sm text-white focus:border-blue-500 outline-none">
+              <option value="ONCE">Einmalig</option>
+              <option value="DAILY">Täglich</option>
+              <option value="WEEKLY">Wöchentlich</option>
+              <option value="MONTHLY">Monatlich</option>
+            </select>
+          </div>
+        </div>
+
+        <div>
+          <label class="block text-xs font-medium text-slate-400 mb-1">Beschreibung für Techniker</label>
+          <textarea id="task-desc" rows="2" placeholder="Zusätzliche Hinweise oder Anweisungen..." class="w-full bg-slate-900 border border-slate-700 rounded-lg p-2.5 text-sm text-white focus:border-blue-500 outline-none"></textarea>
+        </div>
+
+        <div class="pt-2 flex gap-2">
+          <button type="submit" id="btn-save-task" class="flex-1 bg-blue-600 hover:bg-blue-500 text-white font-semibold py-2.5 rounded-lg text-sm transition">
+            In Cloud Speichern
+          </button>
+          <button type="button" class="btn-close-modal bg-slate-700 hover:bg-slate-600 text-slate-300 font-semibold py-2.5 px-4 rounded-lg text-sm">Abbrechen</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- MODAL: NEUES OBJEKT -->
+  <div id="modal-loc" class="fixed inset-0 bg-black/75 backdrop-blur-sm z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 hidden">
+    <div class="bg-slate-800 border border-slate-700 w-full max-w-md rounded-t-2xl sm:rounded-2xl p-5 space-y-4">
+      <div class="flex justify-between items-center border-b border-slate-700 pb-3">
+        <h3 class="font-bold text-lg text-white"><i class="fa-solid fa-building text-blue-400"></i> Neues Objekt anlegen</h3>
+        <button class="btn-close-modal text-slate-400 hover:text-white"><i class="fa-solid fa-xmark text-xl"></i></button>
+      </div>
+
+      <form id="form-loc" class="space-y-3">
+        <div>
+          <label class="block text-xs font-medium text-slate-400 mb-1">Objektname *</label>
+          <input type="text" id="loc-name" required placeholder="z. B. Wohnanlage Parkstraße / Gewerbepark West" class="w-full bg-slate-900 border border-slate-700 rounded-lg p-2.5 text-sm text-white focus:border-blue-500 outline-none">
+        </div>
+
+        <div>
+          <label class="block text-xs font-medium text-slate-400 mb-1">Genaue Adresse (für Google Maps Navigation) *</label>
+          <input type="text" id="loc-address" required placeholder="Musterstraße 12, 69115 Heidelberg" class="w-full bg-slate-900 border border-slate-700 rounded-lg p-2.5 text-sm text-white focus:border-blue-500 outline-none">
+        </div>
+
+        <div>
+          <label class="block text-xs font-medium text-slate-400 mb-1">Einheiten / Zusatzinfo</label>
+          <input type="text" id="loc-units" placeholder="z. B. 12 Wohneinheiten, Haus B, Hof links" class="w-full bg-slate-900 border border-slate-700 rounded-lg p-2.5 text-sm text-white focus:border-blue-500 outline-none">
+        </div>
+
+        <div class="pt-2 flex gap-2">
+          <button type="submit" id="btn-save-loc" class="flex-1 bg-blue-600 hover:bg-blue-500 text-white font-semibold py-2.5 rounded-lg text-sm transition">
+            Objekt Anlegen
+          </button>
+          <button type="button" class="btn-close-modal bg-slate-700 hover:bg-slate-600 text-slate-300 font-semibold py-2.5 px-4 rounded-lg text-sm">Abbrechen</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- MODAL: AUFGABEN-DETAILS & DOKUMENTATION -->
+  <div id="modal-detail" class="fixed inset-0 bg-black/75 backdrop-blur-sm z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 hidden">
+    <div class="bg-slate-800 border border-slate-700 w-full max-w-md rounded-t-2xl sm:rounded-2xl p-5 space-y-4 max-h-[90vh] overflow-y-auto">
+      <div class="flex justify-between items-center border-b border-slate-700 pb-3">
+        <h3 id="detail-title" class="font-bold text-lg text-white">Aufgaben-Details</h3>
+        <button class="btn-close-modal text-slate-400 hover:text-white"><i class="fa-solid fa-xmark text-xl"></i></button>
+      </div>
+
+      <div class="space-y-3 text-sm">
+        <div id="detail-loc-box" class="bg-slate-900 p-3 rounded-lg border border-slate-700">
+          <p class="font-semibold text-blue-400 text-xs uppercase tracking-wider mb-1">Standort & Navigation</p>
+          <p id="detail-loc-name" class="font-bold text-white"></p>
+          <p id="detail-loc-addr" class="text-xs text-slate-400 mt-0.5"></p>
+          <button id="btn-detail-nav" class="mt-2 w-full bg-emerald-600 hover:bg-emerald-500 text-white font-semibold py-2 px-3 rounded text-xs flex items-center justify-center gap-2 shadow">
+            <i class="fa-solid fa-compass"></i> Route in Google Maps starten
+          </button>
+        </div>
+
+        <div>
+          <p class="text-xs text-slate-400 font-medium">Anweisung / Beschreibung:</p>
+          <p id="detail-desc" class="text-slate-200 mt-1 bg-slate-900/50 p-2.5 rounded border border-slate-700/50 text-xs"></p>
+        </div>
+
+        <!-- TECHNIKER BESTÄTIGUNGS-FORMULAR -->
+        <div class="border-t border-slate-700 pt-3 space-y-3">
+          <h4 class="font-bold text-slate-200 text-xs uppercase tracking-wider">Ausführung & Dokumentation</h4>
+
+          <div>
+            <label class="block text-xs font-medium text-slate-400 mb-1">Rückmeldung / Notiz</label>
+            <textarea id="detail-note" rows="2" placeholder="z. B. Ventildichtung ausgetauscht..." class="w-full bg-slate-900 border border-slate-700 rounded-lg p-2.5 text-sm text-white focus:border-blue-500 outline-none"></textarea>
+          </div>
+
+          <div>
+            <label class="block text-xs font-medium text-slate-400 mb-1">Foto-Nachweis (Kamera / Galerie)</label>
+            <input type="file" id="detail-image-input" accept="image/*" capture="environment" class="hidden">
+            <button type="button" id="btn-trigger-camera" class="w-full bg-slate-700 hover:bg-slate-600 text-slate-200 font-semibold py-2.5 rounded-lg text-xs flex items-center justify-center gap-2 border border-slate-600">
+              <i class="fa-solid fa-camera"></i> Foto aufnehmen oder hochladen
+            </button>
+            <div id="detail-img-preview-container" class="mt-2 hidden">
+              <img id="detail-img-preview" class="w-full h-40 object-cover rounded-lg border border-slate-700">
+            </div>
+          </div>
+
+          <div id="complete-action-box" class="pt-2">
+            <!-- Dynamisch: Erledigt-Button oder Bestätigungsbadge -->
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- FIREBASE MODULES & REALTIME SYNC LOGIC -->
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+    import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+    import { getFirestore, collection, doc, setDoc, updateDoc, deleteDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+    // Firebase Config Initialization
+    const appId = typeof __app_id !== 'undefined' ? __app_id : 'hausmeister-app';
+    const firebaseConfig = typeof __firebase_config !== 'undefined' 
+      ? JSON.parse(__firebase_config) 
+      : {
+          // Standard Fallback Config
+          apiKey: "AIzaSyDemoConfigForJanitorialAppKey",
+          authDomain: "demo-hausmeister.firebaseapp.com",
+          projectId: "demo-hausmeister",
+          storageBucket: "demo-hausmeister.appspot.com",
+          messagingSenderId: "123456789",
+          appId: "1:123456789:web:demo"
+        };
+
+    const app = initializeApp(firebaseConfig);
+    const auth = getAuth(app);
+    const db = getFirestore(app);
+
+    // Global State
+    let currentUser = null;
+    let state = {
+      role: 'leiter', // 'leiter' | 'techniker'
+      locations: [],
+      tasks: [],
+      activeTab: 'tasks',
+      filterType: 'ALL',
+      activeTaskId: null
+    };
+
+    // Strict Collection Paths (Rule 1)
+    const LOCATIONS_COLL = collection(db, 'artifacts', appId, 'public', 'data', 'locations');
+    const TASKS_COLL = collection(db, 'artifacts', appId, 'public', 'data', 'tasks');
+
+    // 1. AUTHENTICATION & INITIALIZATION
+    async function initAuth() {
+      try {
+        if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+          await signInWithCustomToken(auth, __initial_auth_token);
+        } else {
+          await signInAnonymously(auth);
+        }
+      } catch (err) {
+        console.warn("Auth Fallback Error:", err);
+      }
+    }
+
+    onAuthStateChanged(auth, (user) => {
+      currentUser = user;
+      if (user) {
+        setupRealtimeSync();
+      }
+    });
+
+    initAuth();
+
+    // 2. REALTIME FIRESTORE LISTENERS
+    function setupRealtimeSync() {
+      // Sync Locations Collection
+      onSnapshot(LOCATIONS_COLL, (snapshot) => {
+        state.locations = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
+        render();
+      }, (error) => console.error("Location sync error:", error));
+
+      // Sync Tasks Collection
+      onSnapshot(TASKS_COLL, (snapshot) => {
+        state.tasks = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
+        // Memory Sorting by Created At
+        state.tasks.sort((a, b) => (b.createdAtTimestamp || 0) - (a.createdAtTimestamp || 0));
+        render();
+      }, (error) => console.error("Task sync error:", error));
+    }
+
+    // 3. EVENT LISTENERS & DOM HANDLERS
+    document.addEventListener('DOMContentLoaded', () => {
+      setupUIEvents();
+    });
+
+    function setupUIEvents() {
+      // Role Switcher
+      document.getElementById('role-toggle').addEventListener('click', () => {
+        state.role = state.role === 'leiter' ? 'techniker' : 'leiter';
+        render();
+      });
+
+      // Navigation Tabs
+      document.getElementById('tab-tasks').addEventListener('click', () => switchTab('tasks'));
+      document.getElementById('tab-locations').addEventListener('click', () => switchTab('locations'));
+
+      // Modals
+      document.getElementById('btn-open-task-modal').addEventListener('click', () => {
+        populateLocationDropdown();
+        document.getElementById('modal-task').classList.remove('hidden');
+      });
+
+      document.getElementById('btn-open-loc-modal').addEventListener('click', () => {
+        document.getElementById('modal-loc').classList.remove('hidden');
+      });
+
+      document.querySelectorAll('.btn-close-modal').forEach(btn => {
+        btn.addEventListener('click', () => {
+          document.querySelectorAll('#modal-task, #modal-loc, #modal-detail').forEach(m => m.classList.add('hidden'));
+        });
+      });
+
+      // Filter
+      document.getElementById('filter-type').addEventListener('change', (e) => {
+        state.filterType = e.target.value;
+        renderTasks();
+      });
+
+      // Submit: New Location
+      document.getElementById('form-loc').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        if (!currentUser) return;
+
+        const locId = Date.now().toString();
+        const newLoc = {
+          name: document.getElementById('loc-name').value,
+          address: document.getElementById('loc-address').value,
+          units: document.getElementById('loc-units').value || ''
+        };
+
+        try {
+          await setDoc(doc(LOCATIONS_COLL, locId), newLoc);
+          document.getElementById('form-loc').reset();
+          document.getElementById('modal-loc').classList.add('hidden');
+        } catch (err) {
+          console.error("Error saving location:", err);
+        }
+      });
+
+      // Submit: New Task
+      document.getElementById('form-task').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        if (!currentUser) return;
+
+        const taskId = Date.now().toString();
+        const newTask = {
+          title: document.getElementById('task-title').value,
+          locationId: document.getElementById('task-location').value,
+          type: document.getElementById('task-type').value,
+          interval: document.getElementById('task-interval').value,
+          desc: document.getElementById('task-desc').value || '',
+          status: 'OPEN',
+          createdAt: new Date().toLocaleDateString('de-DE'),
+          createdAtTimestamp: Date.now(),
+          note: '',
+          image: null
+        };
+
+        try {
+          await setDoc(doc(TASKS_COLL, taskId), newTask);
+          
